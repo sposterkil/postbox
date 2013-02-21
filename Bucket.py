@@ -32,7 +32,7 @@ class EchoBot(bot.SimpleBot):
 
     def parse(message):
         # We'll handle checking for assignment/triggers in here
-        if message.match("[(postbox|Postbox)\\W\\s+.+(is)\\s+.+]"):
+        if message.match('[(postbox|Postbox)\\s\\W\\s+.+(is)\\s+.+]'):
             print("Matched a command!")
         else:
             print("Not a command.")
