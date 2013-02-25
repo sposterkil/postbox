@@ -20,7 +20,7 @@ class IRCBot(bot.SimpleBot):
             self.send_message(event.target, event.message)
 
     def on_private_message(self, event):
-        print('Echoing private message from ' + event.source + ': ' + event.message)
+        print('Echoing private message from %s: %s') % (event.source, event.message)
         self.send_message(event.source, event.message)
 
     def get_ops(self, event):
@@ -36,7 +36,7 @@ class IRCBot(bot.SimpleBot):
             print('Joined channel.')
             self.send_message('NickServ', 'identify bukkpass101')
         else:
-            self.send_message(event.target, 'Hello, ' + event.source + '.')
+            self.send_message(event.target, 'Hello, %s.') % (event.source)
 
     def parse_assignment(self, event):
         print 'parse_assignment '
