@@ -5,18 +5,18 @@ from postconfig import *
 
 
 class IRCBot(bot.SimpleBot):
-    print('Starting...')
+    print 'Starting...'
     print 'MIN_LEN = %d' % (MIN_LEN)
-    print 'CANON_REGEX = %s' % (CANON_REGEX)
+    print 'CANON_REGEX = %s' % (str(CANON_REGEX))
 
     def on_channel_message(self, event):
         message = event.message.split()
         if message[0].upper == 'EXITNOW':
-            print('Recived Exit Order')
+            print 'Recived Exit Order'
             if event.source.upper() == 'PISKETCH' or event.source.upper() == 'PAOANI':
                 sys.exit()
         elif len(message[0].upper()) > MIN_LEN:
-            print('Message over MIN_LEN, sending to parser: %s (from %s)') % (event.message, event.source)
+            print 'Message over MIN_LEN, sending to parser: "%s" (from %s)' % (event.message, event.source)
             self.start_parse(event)
             # self.send_message(event.target, event.message)
 
@@ -25,7 +25,7 @@ class IRCBot(bot.SimpleBot):
         self.send_message(event.source, event.message)
 
     def update_ops(self, event):
-        print "getops executing"
+        print "running NAMES"
         self.execute('NAMES', '#postroom')
 
     def on_name_reply(self, event):
@@ -41,37 +41,31 @@ class IRCBot(bot.SimpleBot):
             print('Joined channel.')
             self.send_message('NickServ', 'identify bukkpass101')
         else:
-            self.send_message(event.target, 'Hello, ' + event.source + '.')
+            self.send_message(event.target, 'Hello, %s.' % (event.source))
 
-    def parse_assignment(self, event):
-        print 'parse_assignment '
-        # regex at http://cl.ly/26112w0z0142 for analysis
-        elements = re.match(CANON_REGEX, event.message).groupdict("")
-        print elements
-        x = elements['x']
-        verb = elements['verb']  # .join(elements['action'])
-        y = elements['y']
-        print event.source, x, verb, y, "\n"
-        print type(event.source), type(x), type(verb), type(y), "\n"
-        self.send_message(event.target, 'Okay %s, %s %s %s.') % (event.source, x, verb, y)
+    def parse_assignment(self, event, elements):
+        print 'parse_assignment called'
+        # regex at http://cl.ly/16152X1l292c for analysis
+        TRIGGERS.update({elements['x']: '%s %s %s.' % (elements['x'], elements['verb'] + elements['action'],
+                elements['y'])})
+        self.send_message(event.target, 'Okay %s, %s %s %s.' % (event.source, elements['x'],
+                elements['verb'] + elements['action'], elements['y']))
+        print TRIGGERS.viewitems()
 
     def parse_trigger(self, event):
-        # tbd
         print 'parse_trigger called'
+        if event.message in TRIGGERS:
+            self.send_message(TRIGGERS)
 
     def start_parse(self, event):
         # We'll handle checking for assignment/triggers in here.
         # If the message looks like an assignment, pass it to an appropriate method
         # If it looks like it could trigger something, likewise
-        # http://cl.ly/1R301X0c2E1Q
-        if re.match(CANON_REGEX, event.message):
-            self.parse_assignment(event)
-            return True
+        if re.match(CANON_REGEX, event.message) is not None:
+            self.parse_assignment(event, re.match(CANON_REGEX, event.message).groupdict(""))
         else:
             # If start_parse was called at all, we should check if it's a trigger
-            self.parse_trigger(event)
-            return True
-        return False
+            self.parse_trigger(event, event.message)
 
 
 if __name__ == '__main__':
