@@ -19,16 +19,16 @@ class IRCBot(bot.SimpleBot):
         elif len(message[0]) > MIN_LEN:
             print 'Message over MIN_LEN, sending to parser: "%s" (from %s)' % (event.message, event.source)
             self.start_parse(event)
-            # self.send_message(event.target, event.message)
 
     def on_private_message(self, event):
         print('Echoing private message from %s: %s') % (event.source, event.message)
         self.send_message(event.source, event.message)
 
-    def update_ops(self, event):
-        print "running NAMES"
-        self.execute('NAMES', '#ridersofbrohan')  # Remove hardcoded reference
-        print OPS
+    def on_who_reply(self, event):
+        print 'Recieved WHORPL!'
+        print event.user_list
+        for user in event.user_list:
+            print flags
 
     def on_name_reply(self, event):
         for name in event.name_list:
@@ -37,13 +37,12 @@ class IRCBot(bot.SimpleBot):
                 OPS.append(name)
 
     def on_join(self, event):
-        # self.update_ops(event)
-        # print OPS
-        # print type(event.source)
         if event.source == self.nickname:
             print('Joined channel.')
             self.send_message('NickServ', 'identify bukkpass101')
         else:
+            self.execute('NAMES', event.target)
+            self.execute('WHO', event.target)
             self.send_message(event.target, 'Hello, %s.' % (event.source))
 
     def parse_assignment(self, event, elements):
@@ -73,8 +72,8 @@ class IRCBot(bot.SimpleBot):
 
 
 if __name__ == '__main__':
-    echo = IRCBot(NICK)  # Name it
-    echo.connect('irc.freenode.net', channel=['#ridersofbrohan'])  # connect
+    echo = IRCBot(NICK)
+    echo.connect('irc.freenode.net', channel=['#ridersofbrohan'])
     print 'About to start!'
-    echo.start()  # start
+    echo.start()
     print 'Started!'
