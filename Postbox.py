@@ -1,40 +1,40 @@
 import sys
 import re
 import cPickle as pickle
-# from pbcfg import *
-from ircutils import bot  # , events, client
+from ircutils import bot
 
 
 class Postbox(bot.SimpleBot):
 
-    # Add more channels on more servers by adding a list in the form [['channel1', 'channel2'], 'server']
-    CHANNElS = [[['ridersofbrohan'], 'irc.freenode.net']]
-    NICK = 'King_of_Brohan'
-    MIN_LEN = 2
-    CANON_REGEX = re.compile('(?:%s.capitalize()|%s)(?:[,:]\s|\s)(?P<x>[^.!]+)\s(?P<verb>is|are)(?P<action>\s<.+>)?\s(?P<y>[^.!]+).{0,3}' % (NICK, NICK))
-    TRIGGERS = {}
-    OPS = []
+    def __init__(self):
+        print 'Initializing...'
 
-    print 'Starting...'
-    print 'MIN_LEN = %d' % (MIN_LEN)
-    print 'CANON_REGEX = %s' % (str(CANON_REGEX))
-    print 'Attempting to load pickled triggers...'
-    try:
-        TRIGGERS = pickle.load(open('TRIGGERS', 'rb'))
-    except IOError, e:
-        print 'IOError Exception, using empty triggers DB'
-        print e
-        TRIGGERS = {}
-    else:
-        print 'Triggers DB loaded.'
+        # CONFIG VARIABLES
+        NICK = 'Postbox'
+        # Add more channels on more servers by adding a list in the form [['channel1', 'channel2'], 'server']
+        self.CHANNElS = [[['ridersofbrohan'], 'irc.freenode.net']]
+        self.MIN_LEN = 2
+        self.CANON_REGEX = re.compile('(?:%s.capitalize()|%s)(?:[,:]\s|\s)(?P<x>[^.!]+)\s(?P<verb>is|are)(?P<action>\s<.+>)?\s(?P<y>[^.!]+).{0,3}' % (NICK, NICK))
+        self.TRIGGERS = {}
+        self.OPS = []
+        bot.SimpleBot.__init__(self, NICK)
+
+        print 'Attempting to load pickled triggers...'
+        try:
+            self.TRIGGERS = pickle.load(open('TRIGGERS', 'rb'))
+        except IOError, e:
+            print 'IOError Exception, using empty Triggers DB'
+            print e
+            self.TRIGGERS = {}
+        else:
+            print 'Triggers DB loaded.'
 
     def on_channel_message(self, event):
         message = event.message.split()
-        if str(message[0].upper()) is 'EXITNOW':
+        if 'EXITNOW' in message:
             print 'Recived Exit Order'
-            if event.source.upper() is 'SPOST' or event.source.upper() is 'PAOANI':  # TODO:  Replace with ops check
-                sys.exit()
-        elif len(message[0]) > Postbox.MIN_LEN:
+            sys.exit()
+        elif len(message[0]) > self.MIN_LEN:
             print 'Message over MIN_LEN, sending to parser: "%s" (from %s)' % (event.message, event.source)
             self.start_parse(event)
 
@@ -51,8 +51,8 @@ class Postbox(bot.SimpleBot):
     def on_name_reply(self, event):
         for name in event.name_list:
             print name
-            if name[0] is '@' and name not in Postbox.OPS:
-                Postbox.OPS.append(name)
+            if name[0] is '@' and name not in self.OPS:
+                self.OPS.append(name)
 
     def on_join(self, event):
         self.execute('WHO', event.target)
@@ -67,36 +67,35 @@ class Postbox(bot.SimpleBot):
         # print 'parse_assignment called'
         print elements['action']
         print type(elements['action'])
-        Postbox.TRIGGERS.update({elements['x'].upper(): '%s %s %s.' % (elements['x'], elements['verb'] + elements['action'],
+        self.TRIGGERS.update({elements['x'].upper(): '%s %s %s.' % (elements['x'], elements['verb'] + elements['action'],
                 elements['y'])})
-        pickle.dump(Postbox.TRIGGERS, open('triggers', 'wb'))
+        pickle.dump(self.TRIGGERS, open('triggers', 'wb'))
         self.send_message(event.target, 'Okay %s, %s %s %s.' % (event.source, elements['x'],
                 elements['verb'] + elements['action'], elements['y']))
-        print Postbox.TRIGGERS.viewitems()
+        print self.TRIGGERS.viewitems()
 
     def parse_trigger(self, event):
         # print 'parse_trigger called on %s' % (event.message.upper())
-        if event.message.upper() in Postbox.TRIGGERS:
-            print Postbox.TRIGGERS[event.message.upper()]
-            self.send_message(event.target, Postbox.TRIGGERS[event.message.upper()])
+        if event.message.upper() in self.TRIGGERS:
+            print self.TRIGGERS[event.message.upper()]
+            self.send_message(event.target, self.TRIGGERS[event.message.upper()])
 
     def start_parse(self, event):
-        # We'll handle checking for assignment/triggers in here.
+        # We'll handle initial parsing in here.
         # If the message looks like an assignment, pass it to an appropriate method
         # If it looks like it could trigger something, likewise
         # regex at http://cl.ly/3W2W0J2j0P3o for analysis
-        if re.match(Postbox.CANON_REGEX, event.message) is not None:
-            self.parse_assignment(event, re.match(Postbox.CANON_REGEX, event.message).groupdict(""))
+        if re.match(self.CANON_REGEX, event.message) is not None:
+            self.parse_assignment(event, re.match(self.CANON_REGEX, event.message).groupdict(""))
         else:
             # If start_parse was called at all, we should check if it's a trigger
             self.parse_trigger(event)
 
 
 if __name__ == '__main__':
-    echo = Postbox(Postbox.NICK)  # TODO: This is hardcoded and this is dumb.
-    echo.connect('irc.freenode.net', channel=['#ridersofbrohan'])
-    # for pair in Postbox.CHANNELS:
-    #     echo.connect(pair[1], pair[0])
-    print 'About to start!'
-    echo.start()
-    print 'Started!'
+    bot = Postbox()
+    bot.connect('irc.freenode.net', channel=['#ridersofbrohan'])  # TODO: Unhardcode
+    # for pair in bot.CHANNELS:
+        # bot.connect(pair[1], pair[0])
+    print 'Starting...'
+    bot.start()
