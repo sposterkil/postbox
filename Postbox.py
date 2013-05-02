@@ -11,8 +11,8 @@ class Postbox(bot.SimpleBot):
 
         # CONFIG VARIABLES
         NICK = 'Postbox'
-        # CHANNElS = [[['ridersofbrohan'], 'irc.freenode.net']]
-        # Add more channels on more servers by adding a list in the form [['channel1', 'channel2'], 'server']
+        # CHANNElS = [[['#ridersofbrohan'], 'irc.freenode.net']]
+        # Add more channels on more servers by adding a list in the form [['#channel1', '#channel2'], 'server']
         self.MIN_LEN = 0
         self.CANON_REGEX = re.compile('(?:%s.capitalize()|%s)(?:[,:]\s|\s)(?P<x>[^.!]+)\s(?P<verb>is|are)(?P<action>\s<.+>)?\s(?P<y>[^.!]+).{0,3}' % (NICK, NICK))
         self.TRIGGERS = {}
@@ -112,7 +112,7 @@ class Postbox(bot.SimpleBot):
 if __name__ == '__main__':
     bot = Postbox()
     bot.connect('irc.freenode.net', channel=['#ridersofbrohan'])  # TODO: Unhardcode
-    # for pair in CHANNELS:
-    #     bot.connect(pair[1], pair[0])
+    # for pair in bot.CHANNELS:
+        # bot.connect(pair[1], channel=pair[0])
     print 'Starting...'
     bot.start()
