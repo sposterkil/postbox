@@ -1,80 +1,118 @@
 import sys
 import re
-from ircutils import bot  # , events, client
-from pbconf import *
+import cPickle as pickle
+from ircutils import bot
 
 
-class IRCBot(bot.SimpleBot):
+class Postbox(bot.SimpleBot):
 
-    print 'Starting...'
-    print 'MIN_LEN = %d' % (MIN_LEN)
-    print 'CANON_REGEX = %s' % (str(CANON_REGEX))
+    def __init__(self):
+        print 'Initializing...'
+
+        # CONFIG VARIABLES
+        NICK = 'Postbox'
+        # CHANNElS = [[['#ridersofbrohan'], 'irc.freenode.net']]
+        # Add more channels on more servers by adding a list in the form [['#channel1', '#channel2'], 'server']
+        self.MIN_LEN = 0
+        self.CANON_REGEX = re.compile('(?:%s.capitalize()|%s)(?:[,:]\s|\s)(?P<x>[^.!]+)\s(?P<verb>is|are)(?P<action>\s<.+>)?\s(?P<y>[^.!]+).{0,3}' % (NICK, NICK))
+        self.TRIGGERS = {}
+        self.OPS = []
+        bot.SimpleBot.__init__(self, NICK)
+
+        print 'Attempting to load pickled triggers...'
+        try:
+            self.TRIGGERS = pickle.load(open('TRIGGERS', 'rb'))
+        except IOError, e:
+            print 'IOError Exception, using empty Triggers DB'
+            print e
+            self.TRIGGERS = {}
+        else:
+            print 'Triggers DB loaded.'
 
     def on_channel_message(self, event):
-        message = event.message.split()
-        if message[0].upper() is 'EXITNOW':
-            print 'Recived Exit Order'
-            if event.source.upper() is 'SPOST' or event.source.upper() is 'PAOANI':  # Replace with ops check
-                sys.exit()
-        elif len(message[0]) > MIN_LEN:
-            print 'Message over MIN_LEN, sending to parser: "%s" (from %s)' % (event.message, event.source)
+        if len(event.message) > self.MIN_LEN:
+            print 'Parsing: "%s" (from %s)' % (event.message, event.source)
             self.start_parse(event)
-            # self.send_message(event.target, event.message)
 
     def on_private_message(self, event):
-        print('Echoing private message from %s: %s') % (event.source, event.message)
+        print('PM From %s: %s') % (event.source, event.message)
         self.send_message(event.source, event.message)
 
-    def update_ops(self, event):
-        print "running NAMES"
-        self.execute('NAMES', '#ridersofbrohan')  # Remove hardcoded reference
-        print OPS
+    def on_who_reply(self, event):
+        print 'Recieved WHORPL!'
+        print event.user_list
+        for user in event.user_list:
+            print user
 
     def on_name_reply(self, event):
         for name in event.name_list:
             print name
-            if name[0] is '@' and name not in OPS:
-                OPS.append(name)
+            if name[0] is '@' and name not in self.OPS:
+                self.OPS.append(name)
 
     def on_join(self, event):
-        # self.update_ops(event)
-        # print OPS
-        # print type(event.source)
         if event.source == self.nickname:
-            print('Joined channel.')
+            print 'Joined channel %s.' % (event.target)
             self.send_message('NickServ', 'identify bukkpass101')
         else:
             self.send_message(event.target, 'Hello, %s.' % (event.source))
 
+    def on_notice(self, event):
+        print '!' + event.message
+
+    def response(self, kind, message, event):
+        print kind
+        print message
+        if kind is ' <action>':
+            self.send_action(event.target, message)
+        elif kind is ' <reply>' or kind is '':
+            self.send_message(event.target, message)
+
     def parse_assignment(self, event, elements):
-        print 'parse_assignment called'
-        # regex at http://cl.ly/16152X1l292c for analysis
-        TRIGGERS.update({elements['x'].upper(): '%s %s %s.' % (elements['x'], elements['verb'] + elements['action'],
-                elements['y'])})
-        self.send_message(event.target, 'Okay %s, %s %s %s.' % (event.source, elements['x'],
-                elements['verb'] + elements['action'], elements['y']))
-        print TRIGGERS.viewitems()
+        x = elements['x']
+        verb = elements['verb']
+        y = elements['y']
+        action = elements['action']
+        storemessage = ''
+
+        if action is ' ':
+            storemessage = str.join(' ', [x, verb, y]) + '.'
+            print storemessage
+        elif action is ' <action>' or action is ' <reply>':
+            storemessage = y
+            print storemessage
+
+        self.TRIGGERS.update({x.upper(): [action, storemessage]})
+
+        pickle.dump(self.TRIGGERS, open('triggers', 'wb'))
+        self.send_message(event.target, 'Okay %s, %s %s %s.' % (event.source, x, verb + action, y))
+        # print self.TRIGGERS.viewitems()
 
     def parse_trigger(self, event):
-        print 'parse_trigger called on %s' % (event.message.upper())
-        if event.message.upper() in TRIGGERS:
-            print TRIGGERS[event.message.upper()]
-            self.send_message(event.target, TRIGGERS[event.message.upper()])
+        if event.message.upper() in self.TRIGGERS:
+            print self.TRIGGERS[event.message.upper()]
+            kind = self.TRIGGERS[event.message.upper()][0]
+            message = self.TRIGGERS[event.message.upper()][1]
+            self.response(kind, message, event)
 
     def start_parse(self, event):
-        # We'll handle checking for assignment/triggers in here.
+        # We'll handle initial parsing in here.
         # If the message looks like an assignment, pass it to an appropriate method
         # If it looks like it could trigger something, likewise
-        if re.match(CANON_REGEX, event.message) is not None:
-            self.parse_assignment(event, re.match(CANON_REGEX, event.message).groupdict(""))
+        # regex at http://cl.ly/3W2W0J2j0P3o for analysis
+        if event.message[0].upper() is 'EXITNOW':
+            sys.exit(0)
+        elif re.match(self.CANON_REGEX, event.message) is not None:
+            self.parse_assignment(event, re.match(self.CANON_REGEX, event.message).groupdict(""))
         else:
             # If start_parse was called at all, we should check if it's a trigger
             self.parse_trigger(event)
 
 
 if __name__ == '__main__':
-    echo = IRCBot(NICK)  # Name it
-    echo.connect('irc.freenode.net', channel=['#ridersofbrohan'])  # connect
-    print 'About to start!'
-    echo.start()  # start
-    print 'Started!'
+    bot = Postbox()
+    bot.connect('irc.freenode.net', channel=['#ridersofbrohan'])  # TODO: Unhardcode
+    # for pair in bot.CHANNELS:
+        # bot.connect(pair[1], channel=pair[0])
+    print 'Starting...'
+    bot.start()
